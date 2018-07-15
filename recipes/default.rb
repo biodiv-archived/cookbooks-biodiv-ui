@@ -19,4 +19,47 @@
 
 include_recipe "nodejs::nodejs_from_package"
 
+biodivUiRepo = "#{Chef::Config[:file_cache_path]}/biodiv-ui"
 
+bash 'cleanup extracted biodiv-ui' do
+   code <<-EOH
+   rm -rf #{node.biodivUi.extracted}
+   EOH
+   action :nothing
+   notifies :run, 'bash[unpack biodiv-ui]'
+end
+
+# download git repository zip
+remote_file node.biodivUi.download do
+  source   node.biodivUi.link
+  mode     0644
+  notifies :run, 'bash[cleanup extracted biodiv-ui]',:immediately
+end
+
+bash 'unpack biodiv-ui' do
+  code <<-EOH
+  cd "#{node.biodivUi.directory}"
+  unzip  #{node.biodivUi.download}
+  expectedFolderName=`basename #{node.biodivUi.extracted} | sed 's/.zip$//'`
+  folderName=`basename #{node.biodivUi.download} | sed 's/.zip$//'`
+
+  if [ "$folderName" != "$expectedFolderName" ]; then
+      mv "$folderName" "$expectedFolderName"
+  fi
+
+  EOH
+  not_if "test -d #{node.biodivUi.extracted}"
+  notifies :run, "npm_package[compile_biodiv-ui]", :immediately
+end
+
+npm_package "compile_biodiv-ui" do
+  path "#{node.biodivUi.extracted}"
+  json true
+end
+
+bash 'npm run build:kk' do
+  code <<-EOH
+  cd "#{node.biodivUi.extracted}"
+  yes | npm run build:kk
+  EOH
+end 
