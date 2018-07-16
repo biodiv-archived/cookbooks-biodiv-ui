@@ -20,10 +20,12 @@
 include_recipe "nodejs::nodejs_from_package"
 
 biodivUiRepo = "#{Chef::Config[:file_cache_path]}/biodiv-ui"
+additionalConfig = "#{node.biodivUi.extracted}/.env.kk"
 
 bash 'cleanup extracted biodiv-ui' do
    code <<-EOH
    rm -rf #{node.biodivUi.extracted}
+   rm -f #{additionalConfig}
    EOH
    action :nothing
    notifies :run, 'bash[unpack biodiv-ui]'
@@ -49,8 +51,16 @@ bash 'unpack biodiv-ui' do
 
   EOH
   not_if "test -d #{node.biodivUi.extracted}"
+  notifies :create, "template[#{additionalConfig}]",:immediately
+end
+
+
+#  create additional-config
+template additionalConfig do
+  source "env.kk.erb"
   notifies :run, "npm_package[compile_biodiv-ui]", :immediately
 end
+
 
 npm_package "compile_biodiv-ui" do
   path "#{node.biodivUi.extracted}"
@@ -62,4 +72,4 @@ bash 'npm run build:kk' do
   cd "#{node.biodivUi.extracted}"
   yes | npm run build:kk
   EOH
-end 
+end
